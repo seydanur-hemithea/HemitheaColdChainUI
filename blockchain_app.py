@@ -18,7 +18,7 @@ def init_supabase():
 supabase = init_supabase()
 
 st.set_page_config(page_title="Hemithea Cold Chain Analytics", layout="wide")
-st.title("🚚 Eker Soğuk Zincir Blockchain & AI Real-Time Dashboard")
+st.title("🚚 Hemithea Soğuk Zincir Blockchain & AI Real-Time Dashboard")
 
 # 2. Verileri Buluttan Çekme
 def load_data():
