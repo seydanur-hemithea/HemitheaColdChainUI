@@ -4,8 +4,10 @@ from supabase import create_client, Client
 import qrcode
 from io import BytesIO
 
-# 1. Supabase Bağlantısı (Güvenli Yöntem)
-import streamlit as st
+# URL'deki ?product_id=... parametresini otomatik okur
+query_params = st.query_params
+default_product = query_params.get("product_id", None)
+
 
 # Değerleri açıkça yazmıyoruz, Streamlit Secrets kasasından çekiyoruz
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -57,9 +59,13 @@ if not df.empty:
         
         # Panelden sorgulamak için bir ürün seçelim
         product_list = df['product_id'].unique()
-        selected_product = st.selectbox("Doğrulanacak Ürünü Seçin", product_list)
-        
-        product_df = df[df['product_id'] == selected_product]
+        # Selectbox (Ürün seçme kutusu) kısmını da buna göre güncelleriz:
+        if default_product in product_list:
+            # Eğer karekoddan gelindiyse, listede otomatik o ürünü seçili getirir
+            selected_product = st.selectbox("Doğrulanacak Ürünü Seçin", product_list, index=list(product_list).index(default_product))
+        else:
+            selected_product = st.selectbox("Doğrulanacak Ürünü Seçin", product_list)                                                              
+            product_df = df[df['product_id'] == selected_product]
         
         if not product_df.empty:
             # Ürünün blockchain doğrulama URL'i (Yayına aldığımız link olacak)
