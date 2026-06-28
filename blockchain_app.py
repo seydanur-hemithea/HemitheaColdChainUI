@@ -8,7 +8,6 @@ from io import BytesIO
 query_params = st.query_params
 default_product = query_params.get("product_id", None)
 
-
 # Değerleri açıkça yazmıyoruz, Streamlit Secrets kasasından çekiyoruz
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
@@ -59,18 +58,22 @@ if not df.empty:
         
         # Panelden sorgulamak için bir ürün seçelim
         product_list = df['product_id'].unique()
-        # Selectbox (Ürün seçme kutusu) kısmını da buna göre güncelleriz:
+        
+        # Selectbox (Ürün seçme kutusu) güncellenmiş hali:
         if default_product in product_list:
             # Eğer karekoddan gelindiyse, listede otomatik o ürünü seçili getirir
             selected_product = st.selectbox("Doğrulanacak Ürünü Seçin", product_list, index=list(product_list).index(default_product))
         else:
             selected_product = st.selectbox("Doğrulanacak Ürünü Seçin", product_list)                                                              
-            product_df = df[df['product_id'] == selected_product]
+        
+        # Değişkeni if-else'in tamamen dışına aldık ki her iki durumda da çalışsın
+        product_df = df[df['product_id'] == selected_product]
         
         if not product_df.empty:
-            # Ürünün blockchain doğrulama URL'i (Yayına aldığımız link olacak)
-            # Şimdilik simüle etmek için ürün ID'sini gömüyoruz
-            verification_url = f"https://hemithea-coldchain.streamlit.app/?product_id={selected_product}"
+            # Buradaki linki senin kendi yeni repo ismine göre güncelledim canım:
+            
+            verification_url = f"https://websydnrcvpy-v94hbqbo6agxbxtqsms6f8.streamlit.app/?product_id={selected_product}"
+
             
             # Karekod Oluşturma
             qr = qrcode.QRCode(version=1, box_size=10, border=4)
