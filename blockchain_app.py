@@ -4,7 +4,7 @@ from supabase import create_client, Client
 import qrcode
 from io import BytesIO
 
-# URL'deki ?product_id=... parametresini otomatik okur
+# URL'deki ?product_id=... parametresini otomatik okur (KAREKODDAN VERİ ÇEKME KISMI BURASI)
 query_params = st.query_params
 default_product = query_params.get("product_id", None)
 
@@ -18,8 +18,13 @@ def init_supabase():
 
 supabase = init_supabase()
 
-st.set_page_config(page_title="Hemithea Cold Chain Analytics", layout="wide")
-st.title("🚚 Hemithea Soğuk Zincir Blockchain & AI Real-Time Dashboard")
+# Mobil Ekran Optimizasyonu İçin Sayfa Ayarları (Layout'u telefona göre ortaladık)
+st.set_page_config(page_title="Hemithea Cold Chain", layout="centered", page_icon="🚚")
+
+# Mobil Uyumlu Başlık Tasarımı (Eker kelimeleri tamamen uçtu, saf Hemithea oldu)
+st.markdown("<h2 style='text-align: center; margin-bottom: 0;'>🚚 Hemithea</h2>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: gray; font-size: 14px;'>Smart Cold Chain: Blockchain & AI Verified</p>", unsafe_allow_html=True)
+st.markdown("---")
 
 # 2. Verileri Buluttan Çekme
 def load_data():
@@ -29,64 +34,81 @@ def load_data():
 df = load_data()
 
 if not df.empty:
-    # Metrik Kartları
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Toplam Blok Sayısı", len(df))
-    with col2:
-        st.metric("Son Sıcaklık", f"{df['temperature_c'].iloc[0]} °C")
-    with col3:
-        st.metric("Ortalama Risk Skoru", f"{df['AI_Risk_Score'].mean():.2f}")
-    with col4:
-        st.metric("Kritik Anomali Sayısı", len(df[df['AI_Security_Status'] == 'ANOMALY']))
-
-    # Grafik ve Tablo Yan Yana
-    left_col, right_col = st.columns([2, 1])
+    # ----------------------------------------------------------------------
+    # 1. BÖLÜM: ÜRÜN SEÇİM ALANI (Karekoddan ID gelirse otomatik eşleşir)
+    # ----------------------------------------------------------------------
+    product_list = df['product_id'].unique()
     
-    with left_col:
-        st.subheader("📈 Gerçek Zamanlı Sıcaklık Takip Grafiği")
-        st.line_chart(df.set_index('processed_timestamp')['temperature_c'])
+    if default_product in product_list:
+        selected_product = st.selectbox("📱 Sorgulanan Ürün Kimliği:", product_list, index=list(product_list).index(default_product))
+    else:
+        selected_product = st.selectbox("📱 Sorgulanacak Ürünü Seçin:", product_list)                                                              
+    
+    # Seçilen ürünün verilerini kronolojik sıraya sokuyoruz (Eskiden yeniye)
+    product_df = df[df['product_id'] == selected_product].sort_values('block_index', ascending=True)
+    
+    if not product_df.empty:
+        # En son istasyonun verilerini alıyoruz (Mevcut Durum)
+        latest_record = product_df.iloc[-1]
+        latest_status = latest_record['AI_Security_Status']
+        latest_temp = latest_record['temperature_c']
+        latest_location = latest_record['location']
         
-        st.subheader("📋 Blockchain Ledger Verileri (Supabase)")
-        st.dataframe(df)
-
-    # ==========================================
-    # 2. KAREKOD (QR CODE) DETAYI VE DOĞRULAMA
-    # ==========================================
-    with right_col:
-        st.subheader("🔍 Ürün Karekod Doğrulama")
-        
-        # Panelden sorgulamak için bir ürün seçelim
-        product_list = df['product_id'].unique()
-        
-        # Selectbox (Ürün seçme kutusu) güncellenmiş hali:
-        if default_product in product_list:
-            # Eğer karekoddan gelindiyse, listede otomatik o ürünü seçili getirir
-            selected_product = st.selectbox("Doğrulanacak Ürünü Seçin", product_list, index=list(product_list).index(default_product))
+        # ----------------------------------------------------------------------
+        # 2. BÖLÜM: TÜKETİCİNİN ANLAYACAĞI RENKLİ GÜVENLİK DURUM KARTI
+        # ----------------------------------------------------------------------
+        st.markdown("### 🛡️ Güncel Tazelik Raporu")
+        if latest_status == "SAFE":
+            st.success(f"### ✅ ÜRÜN TAZELİĞİ ONAYLANDI\n\n**📍 Konum:** {latest_location}  \n**🌡️ Sıcaklık:** {latest_temp} °C  \n\n*Hemithea Yapay Zekası ve Blockchain Defteri, bu ürünün güvenle tüketilebileceğini garanti eder.*")
+        elif latest_status == "WARNING":
+            st.warning(f"### ⚠️ SINIRDA SICAKLIK UYARISI\n\n**📍 Konum:** {latest_location}  \n**🌡️ Sıcaklık:** {latest_temp} °C  \n\n*Ürün güvenli bölgede ancak sıcaklık ideal değerlerin biraz üzerinde seyretmiş.*")
         else:
-            selected_product = st.selectbox("Doğrulanacak Ürünü Seçin", product_list)                                                              
+            st.error(f"### 🚨 SOĞUK ZİNCİR KIRILMASI!\n\n**📍 Konum:** {latest_location}  \n**🌡️ Sıcaklık:** {latest_temp} °C  \n\n*Kritik sıcaklık eşiği aşılmıştır! Bozulma riski nedeniyle tüketilmesi kesinlikle önerilmez!*")
         
-        # Değişkeni if-else'in tamamen dışına aldık ki her iki durumda da çalışsın
-        product_df = df[df['product_id'] == selected_product]
+        # ----------------------------------------------------------------------
+        # 3. BÖLÜM: TÜKETİCİ DOSTU LOKASYON BAZLI SICAKLIK GRAFİĞİ
+        # ----------------------------------------------------------------------
+        st.markdown("### 📈 Tedarik Zinciri Sıcaklık Seyri")
+        # Teknik saat kodları yerine tüketicinin anladığı lokasyon adımlarını grafiğe basıyoruz
+        chart_data = product_df.set_index('location')['temperature_c']
+        st.area_chart(chart_data, color="#2563EB")
         
-        if not product_df.empty:
-            # Buradaki linki senin kendi yeni repo ismine göre güncelledim canım:
+        # ----------------------------------------------------------------------
+        # 4. BÖLÜM: HİKAYELEŞTİRİLMİŞ BLOCKCHAIN ZAMAN TÜNELİ
+        # ----------------------------------------------------------------------
+        st.markdown("### 📍 Şeffaf Blockchain İzlenebilirliği")
+        for idx, row in product_df.iterrows():
+            status_emoji = "🟢" if row['AI_Security_Status'] == "SAFE" else ("🟡" if row['AI_Security_Status'] == "WARNING" else "🔴")
+            st.markdown(
+                f"> {status_emoji} **{row['location']} İstasyonu** \n"
+                f"Sıcaklık: `{row['temperature_c']}°C` | AI Risk Skoru: `%{int(row['AI_Risk_Score'] * 100)}`  \n"
+                f"<small style='color:gray;'>Blok No: #{row['block_index']}</small>", 
+                unsafe_allow_html=True
+            )
             
-            verification_url = f"https://websydnrcvpy-v94hbqbo6agxbxtqsms6f8.streamlit.app/?product_id={selected_product}"
-
-            
-            # Karekod Oluşturma
-            qr = qrcode.QRCode(version=1, box_size=10, border=4)
-            qr.add_data(verification_url)
-            qr.make(fit=True)
-            img = qr.make_image(fill_color="black", back_color="white")
-            
-            # Streamlit'te göstermek için hafızaya kaydetme
-            buf = BytesIO()
-            img.save(buf, format="PNG")
-            st.image(buf.getvalue(), caption=f"{selected_product} için Blockchain Karekodu", use_container_width=True)
-            
-            st.success(f"🔐 Blockchain Durumu: {product_df['AI_Security_Status'].iloc[0]}")
-            st.write(f"📍 Son Konum: {product_df['location'].iloc[0]}")
+        st.markdown("---")
+        
+        # ----------------------------------------------------------------------
+        # 5. BÖLÜM: DİNAMİK KAREKOD ÜRETİM ALANI (Senin Gerçek Linkin)
+        # ----------------------------------------------------------------------
+        st.markdown("### 🔗 Ürüne Özel Karekod")
+        verification_url = f"https://websydnrcvpy-v94hbqbo6agxbxtqsms6f8.streamlit.app/?product_id={selected_product}"
+        
+        qr = qrcode.QRCode(version=1, box_size=10, border=4)
+        qr.add_data(verification_url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="#1E3A8A", back_color="white")
+        
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        st.image(buf.getvalue(), caption=f"{selected_product} Dijital Kimlik Karekodu", use_container_width=True)
+        
+    # ---------------------------------------------------------------------
+    # JÜRİ ÖZEL BÖLÜMÜ (Ham veriler alt tarafta şık bir kutuda gizli kalıyor)
+    # ---------------------------------------------------------------------
+    st.markdown("---")
+    with st.expander("🔬 Jüri Özel: Teknik Supabase Veri Defteri"):
+        st.write("Kriptografik blok indekslerine sahip ham veri tabanı kayıtları:")
+        st.dataframe(df)
 else:
-    st.info("Henüz bulutta veri bulunamadı. Lütfen Spark Consumer'ı çalıştırın.")
+    st.info("Henüz bulutta işlenmiş veri bulunamadı. Lütfen Spark Consumer'ı tetikleyin.")
